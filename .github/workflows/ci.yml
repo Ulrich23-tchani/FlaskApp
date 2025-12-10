@@ -9,7 +9,8 @@ on:
       - main
 
 jobs:
-  build:
+  # --- JOB 1 : LES TESTS ---
+  run-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -29,10 +30,31 @@ jobs:
         run: |
           pytest
 
-      # --- NOUVELLES ÉTAPES POUR DOCKER ---
+      # --- NOTIFICATION EMAIL (Seulement si échec) ---
+      - name: Send mail on failure
+        if: failure()  # Cette ligne dit : "Exécute-moi seulement si l'étape d'avant a raté"
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: ALERTE - Les tests ont échoué !
+          body: Attention, le pipeline a échoué lors des tests. Merci de vérifier le code.
+          to: ngamakojp3@gmail.com # Mets ton vrai email ici pour tester
+          from: GitHub Actions
+
+  # --- JOB 2 : DOCKER (En parallèle) ---
+  docker-build:
+    runs-on: ubuntu-latest
+    # Si on voulait attendre que les tests réussissent avant de lancer Docker,
+    # on ajouterait ici la ligne : needs: run-tests
+    # Mais pour l'exercice "Parallèle", on ne le met pas.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Log in to Docker Hub
-        # On ne fait ça que si c'est pas une Pull Request
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
         with:
@@ -45,5 +67,4 @@ jobs:
         with:
           context: .
           push: true
-          # Remplace 'ton_user' ci-dessous par ton vrai user Docker Hub !
           tags: ${{ secrets.DOCKER_USERNAME }}/flaskapp:latest
